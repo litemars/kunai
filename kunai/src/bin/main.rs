@@ -20,6 +20,7 @@ use kunai::events::{
     ConnectData, DnsQueryData, ErrorData, EventInfo, ExecveData, ExitData, FileData,
     FileRenameData, FileScanData, FilterInfo, InitModuleData, KillData, KunaiEvent, LossData,
     MmapExecData, MprotectData, NetworkInfo, PrctlData, PtraceData, ScanResult, SendDataData,
+    SetCredsData,
     SockAddr, SocketInfo, TargetTask, TaskSection, UnlinkData, UserEvent,
 };
 use kunai::events::{IoUringOp, IoUringSqeData, StartData};
@@ -1031,6 +1032,66 @@ impl EventConsumer<'_> {
                 exe: self.get_exe(tk).into(),
                 task: TaskSection::from_task_info_with_addition(target, tai.unwrap_or_default()),
             },
+        };
+
+        UserEvent::new(data, info)
+    }
+
+    #[inline(always)]
+    fn set_creds_event(
+        &mut self,
+        info: StdEventInfo,
+        bpf_data: bpf_events::CredsData,
+    ) -> UserEvent<SetCredsData> {
+        let (exe, command_line) = self.get_exe_and_command_line(&info);
+
+        let kind = bpf_data.kind.as_str().to_string();
+
+        // Decode LSM_SETID_* flag bits (not applicable to capset).
+        let flags = match bpf_data.kind {
+            bpf_events::CredsChangeKind::SetUid | bpf_events::CredsChangeKind::SetGid => {
+                let mut parts: Vec<&'static str> = Vec::new();
+                let f = bpf_data.flags;
+                if f & (bpf_events::LsmSetIdFlag::Id as u32) != 0 {
+                    parts.push(bpf_events::LsmSetIdFlag::Id.as_str());
+                }
+                if f & (bpf_events::LsmSetIdFlag::Re as u32) != 0 {
+                    parts.push(bpf_events::LsmSetIdFlag::Re.as_str());
+                }
+                if f & (bpf_events::LsmSetIdFlag::Res as u32) != 0 {
+                    parts.push(bpf_events::LsmSetIdFlag::Res.as_str());
+                }
+                if f & (bpf_events::LsmSetIdFlag::Fs as u32) != 0 {
+                    parts.push(bpf_events::LsmSetIdFlag::Fs.as_str());
+                }
+                if parts.is_empty() {
+                    String::new()
+                } else {
+                    parts.join("|")
+                }
+            }
+            _ => String::new(),
+        };
+
+        let snap = |s: &bpf_events::CredSnapshot| kunai::events::CredSnapshot {
+            uid: s.uid,
+            gid: s.gid,
+            euid: s.euid,
+            egid: s.egid,
+            suid: s.suid,
+            sgid: s.sgid,
+            fsuid: s.fsuid,
+            fsgid: s.fsgid,
+        };
+
+        let data = SetCredsData {
+            ancestors: self.get_ancestors_string(&info),
+            exe: exe.into(),
+            command_line,
+            kind,
+            flags,
+            old: snap(&bpf_data.old),
+            new: snap(&bpf_data.new),
         };
 
         UserEvent::new(data, info)
@@ -2110,6 +2171,12 @@ impl EventConsumer<'_> {
                 self.scan_and_print(&mut e);
             }
 
+            EbpfEvent::SetCreds(e) => {
+                let std_info = self.build_std_event_info(e.info);
+                let mut e = self.set_creds_event(std_info, e.data);
+                self.scan_and_print(&mut e);
+            }
+
             EbpfEvent::MmapExec(e) => {
                 let std_info = self.build_std_event_info(e.info);
                 let mut e = self.mmap_exec_event(std_info, e.data);
@@ -3158,6 +3225,7 @@ enum ReplayEvent {
     Prctl(UserEvent<PrctlData>),
     Kill(UserEvent<KillData>),
     Ptrace(UserEvent<PtraceData>),
+    SetCreds(UserEvent<SetCredsData>),
     MmapExec(UserEvent<MmapExecData>),
     MprotectExec(UserEvent<MprotectData>),
     Connect(UserEvent<ConnectData>),
@@ -3188,6 +3256,7 @@ impl ReplayEvent {
             Self::Prctl(u) => c.scan(u),
             Self::Kill(u) => c.scan(u),
             Self::Ptrace(u) => c.scan(u),
+            Self::SetCreds(u) => c.scan(u),
             Self::MmapExec(u) => c.scan(u),
             Self::MprotectExec(u) => c.scan(u),
             Self::Connect(u) => c.scan(u),
@@ -3216,6 +3285,7 @@ impl ReplayEvent {
             Self::Prctl(u) => c.scan_and_print(u),
             Self::Kill(u) => c.scan_and_print(u),
             Self::Ptrace(u) => c.scan_and_print(u),
+            Self::SetCreds(u) => c.scan_and_print(u),
             Self::MmapExec(u) => c.scan_and_print(u),
             Self::MprotectExec(u) => c.scan_and_print(u),
             Self::Connect(u) => c.scan_and_print(u),
@@ -3267,6 +3337,7 @@ impl TryFrom<serde_json::Value> for ReplayEvent {
             Type::Prctl => event_enum!(PrctlData, ReplayEvent::Prctl),
             Type::Kill => event_enum!(KillData, ReplayEvent::Kill),
             Type::Ptrace => event_enum!(PtraceData, ReplayEvent::Ptrace),
+            Type::SetCreds => event_enum!(SetCredsData, ReplayEvent::SetCreds),
             Type::MmapExec => event_enum!(MmapExecData, ReplayEvent::MmapExec),
             Type::MprotectExec => event_enum!(MprotectData, ReplayEvent::MprotectExec),
             Type::Connect => event_enum!(ConnectData, ReplayEvent::Connect),
