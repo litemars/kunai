@@ -2808,13 +2808,15 @@ struct ReplayOpt {
     #[arg(long)]
     bench: bool,
 
-    /// Detection/filtering rule file. Supersedes configuration file.
-    #[arg(short, long, value_name = "FILE")]
-    rule_file: Option<Vec<PathBuf>>,
+    /// Detection/filtering rule file or directory. Directories are scanned for files with
+    /// extensions: .kun, .kunai, .gen, .gene. Supersedes configuration file.
+    #[arg(short, long, value_name = "FILE|DIR")]
+    rules: Option<Vec<PathBuf>>,
 
-    /// File containing IoCs (json line).
-    #[arg(short, long, value_name = "FILE")]
-    ioc_file: Option<Vec<PathBuf>>,
+    /// File or directory containing IoC definitions (json line format). Directories are scanned
+    /// for files with extension: .ioc. Supersedes configuration file.
+    #[arg(short, long, value_name = "FILE|DIR")]
+    iocs: Option<Vec<PathBuf>>,
 
     /// Minimal severity required to show detection
     #[arg(long, short = 's')]
@@ -2835,12 +2837,12 @@ impl TryFrom<ReplayOpt> for Config {
         // command line supersedes configuration
 
         // supersedes configuration
-        if let Some(rules) = opt.rule_file {
+        if let Some(rules) = opt.rules {
             conf.scanner.rules = rules;
         }
 
         // supersedes configuration
-        if let Some(iocs) = opt.ioc_file {
+        if let Some(iocs) = opt.iocs {
             conf.scanner.iocs = iocs;
         }
 
@@ -2857,7 +2859,7 @@ impl TryFrom<ReplayOpt> for Config {
 struct TestOpt {
     /// Paths to the rules we want to test
     #[arg(short, long, value_name = "PATH")]
-    rule_path: Option<Vec<PathBuf>>,
+    rules: Option<Vec<PathBuf>>,
 
     /// Paths to a test directory
     #[arg(short, long, value_name = "DIR")]
@@ -2877,10 +2879,8 @@ impl From<TestOpt> for Config {
     fn from(opt: TestOpt) -> Self {
         let mut conf = Self::default();
 
-        // command line supersedes configuration
-
         // supersedes configuration
-        if let Some(rules) = opt.rule_path {
+        if let Some(rules) = opt.rules {
             conf.scanner.rules = rules;
         }
 
@@ -2931,17 +2931,20 @@ struct RunOpt {
     #[arg(long)]
     send_data_min_len: Option<u64>,
 
-    /// Detection/filtering rule file. Supersedes configuration file.
-    #[arg(short, long, value_name = "FILE")]
-    rule_file: Option<Vec<PathBuf>>,
+    /// Detection/filtering rule file or directory. Directories are scanned for files with
+    /// extensions: .kun, .kunai, .gen, .gene. Supersedes configuration file.
+    #[arg(short, long, value_name = "FILE|DIR")]
+    rules: Option<Vec<PathBuf>>,
 
-    /// File containing IoCs (json line).
-    #[arg(short, long, value_name = "FILE")]
-    ioc_file: Option<Vec<PathBuf>>,
+    /// File or directory containing IoC definitions (json line format). Directories are scanned
+    /// for files with extension: .ioc. Supersedes configuration file.
+    #[arg(short, long, value_name = "FILE|DIR")]
+    iocs: Option<Vec<PathBuf>>,
 
-    /// Yara rules dir/file. Supersedes configuration file.
-    #[arg(short, long, value_name = "FILE")]
-    yara_rules: Option<Vec<PathBuf>>,
+    /// Yara rule file or directory. Directories are scanned for files with extensions: .yar, .yara.
+    /// Supersedes configuration file.
+    #[arg(short, long, value_name = "FILE|DIR")]
+    yara: Option<Vec<PathBuf>>,
 
     /// Minimal severity required to show detection
     #[arg(long)]
@@ -2963,17 +2966,17 @@ impl TryFrom<RunOpt> for Config {
         }
 
         // supersedes configuration
-        if let Some(rules) = opt.rule_file {
+        if let Some(rules) = opt.rules {
             conf.scanner.rules = rules;
         }
 
         // supersedes configuration
-        if let Some(iocs) = opt.ioc_file {
+        if let Some(iocs) = opt.iocs {
             conf.scanner.iocs = iocs;
         }
 
         // supersedes configuration
-        if let Some(yara_rules) = opt.yara_rules {
+        if let Some(yara_rules) = opt.yara {
             conf.scanner.yara = yara_rules;
         }
 
