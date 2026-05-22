@@ -1798,9 +1798,9 @@ dependencies = [
 
 [[package]]
 name = "magic-db"
-version = "0.4.3"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc2fa866c1f862a81a348f2292c6e8a8217035e00b8fa55dcb169b6a0a18da6d"
+checksum = "abec0b936c108ec2330a3cf0f178c32e33e71c35eb8a847460fa6528c94aebd4"
 dependencies = [
  "magic-embed",
  "pure-magic",
@@ -1808,9 +1808,9 @@ dependencies = [
 
 [[package]]
 name = "magic-embed"
-version = "0.3.3"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdb29e9b5a9625cb6666e2515a00926f3abd6c0f5df0a5fa617afc19449c9cb8"
+checksum = "9810de11348ebfbb9f23c51caabaa4b36e37504a3c2ae91c5fd272faef59c666"
 dependencies = [
  "fs-walk 0.2.2",
  "proc-macro2",
@@ -2345,9 +2345,9 @@ dependencies = [
 
 [[package]]
 name = "pure-magic"
-version = "0.2.3"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06d93befe878c62ea9b361ab1d612327259a5aa8b72f46e9c72ec9292e23793c"
+checksum = "c38ffbe5d5de43531c343432d196ba600d3cdc57d09e20fc57e28c7c3e9efba1"
 dependencies = [
  "bincode",
  "chrono",
@@ -2355,8 +2355,8 @@ dependencies = [
  "dyf",
  "flagset",
  "flate2",
- "lazy-cache",
  "memchr",
+ "memmap2",
  "pest",
  "pest_derive",
  "regex",
