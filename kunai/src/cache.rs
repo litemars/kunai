@@ -28,7 +28,7 @@ use crate::{
     yara::Scanner,
 };
 
-const FILE_SIZE_SCAN_LIMIT: u64 = ByteSize::from_mb(100).in_bytes();
+pub const FILE_SIZE_SCAN_LIMIT: u64 = ByteSize::from_mb(100).in_bytes();
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -432,7 +432,7 @@ impl Cache {
         ns: Mnt,
         path: &Path,
         scanner: &mut Scanner<'_>,
-    ) -> Result<Vec<String>, Error> {
+    ) -> Result<(Vec<String>, Option<String>), Error> {
         let Some(mnt_ns) = self.mnt_namespaces.get(&ns) else {
             return Err(Error::UnknownMntNs(ns));
         };
@@ -443,9 +443,10 @@ impl Cache {
             // we create key to check if we already have cached
             // signatures for that file
             let key = Key::from_path_in_ns(ns, path).map_err(namespace::Error::other)?;
+            let mut msg = None;
 
             if key.size > FILE_SIZE_SCAN_LIMIT {
-                return Err(namespace::Error::other(Error::FileSizeScanLimit));
+                msg = Some(String::from("partial scan, file size exceeds scan limit"))
             }
 
             let sigs = match self.signatures.get(&key) {
@@ -465,7 +466,7 @@ impl Cache {
                 }
             };
 
-            Ok(sigs)
+            Ok((sigs, msg))
         });
 
         // we must be sure that we restore our namespace

@@ -411,9 +411,15 @@ impl EventConsumer<'_> {
         }
 
         // we don't actually initialize an empty scanner
-        if files_loaded > 0 {
-            self.file_scanner = Some(Scanner::with_rules(c.build()));
+        if files_loaded == 0 {
+            return Ok(());
         }
+
+        let scanner = Scanner::with_rules(c.build());
+        if let Ok(mut s) = scanner.lock() {
+            s.max_scan_size(FILE_SIZE_SCAN_LIMIT as usize);
+        }
+        self.file_scanner = Some(scanner);
 
         Ok(())
     }
@@ -550,7 +556,10 @@ impl EventConsumer<'_> {
 
     fn init_event_scanner(&mut self) -> anyhow::Result<()> {
         self.engine = Engine::try_from(self.compile_kunai_rules()?)?;
-        info!("number of loaded rules: {}", self.engine.rules_count());
+        info!(
+            "detection engine initialized rules={}",
+            self.engine.rules_count()
+        );
         Ok(())
     }
 
@@ -1899,7 +1908,7 @@ impl EventConsumer<'_> {
                 .cache
                 .get_sig_in_ns(ns, &cache::Path::from(p.to_path_buf()), s)
             {
-                Ok(sigs) => (sigs, None),
+                Ok((sigs, msg)) => (sigs, msg),
                 Err(e) => (vec![], Some(format!("{e}"))),
             },
             None => (vec![], None),
