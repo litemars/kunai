@@ -5,7 +5,7 @@ use huby::ByteSize;
 use kunai_common::time::Time;
 use lru_st::collections::LruHashMap;
 use md5::{Digest, Md5};
-use pure_magic::MagicDb;
+use pure_magic::{readers::DataRead, DataReader, MagicDb};
 
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
@@ -13,7 +13,7 @@ use sha2::{Sha256, Sha512};
 use std::{
     borrow::Cow,
     fs::File,
-    io::{self, Read},
+    io::{self},
     os::unix::prelude::MetadataExt,
     path::PathBuf,
     time::SystemTime,
@@ -28,7 +28,7 @@ use crate::{
     yara::Scanner,
 };
 
-const FILE_SIZE_SCAN_LIMIT: u64 = ByteSize::from_mb(100).in_bytes();
+pub const FILE_SIZE_SCAN_LIMIT: u64 = ByteSize::from_mb(100).in_bytes();
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -152,7 +152,7 @@ impl Hashes {
             .inspect_err(|e| {
                 h.error = Some(format!("failed to open file: {e}",));
             })
-            .and_then(MagicDb::optimal_lazy_cache)
+            .and_then(DataReader::from_file)
             .inspect_err(|e| {
                 h.error = Some(format!("failed to create lazy cache: {e}",));
             })
@@ -163,17 +163,16 @@ impl Hashes {
                 let mut sha256 = Sha256::new();
                 let mut sha512 = Sha512::new();
 
-                let mut buf = [0; 4096];
-                while let Ok(n) = f.read(&mut buf[..]).inspect_err(|e| {
+                while let Ok(buf) = f.read_count(4096).inspect_err(|e| {
                     h.error = Some(format!("failed to read: {e}",));
                 }) {
-                    if n == 0 {
+                    if buf.is_empty() {
                         break;
                     }
-                    md5.update(&buf[..n]);
-                    sha1.update(&buf[..n]);
-                    sha256.update(&buf[..n]);
-                    sha512.update(&buf[..n]);
+                    md5.update(buf);
+                    sha1.update(buf);
+                    sha256.update(buf);
+                    sha512.update(buf);
                 }
 
                 h.md5 = hex::encode(md5.finalize());
@@ -185,7 +184,7 @@ impl Hashes {
             }
 
             h.magic = magic_db
-                .first_magic_with_lazy_cache(&mut f, None)
+                .first_magic(&mut f, None)
                 .inspect_err(|e| {
                     h.error = Some(format!("failed to find magic: {e}",));
                 })
@@ -432,7 +431,7 @@ impl Cache {
         ns: Mnt,
         path: &Path,
         scanner: &mut Scanner<'_>,
-    ) -> Result<Vec<String>, Error> {
+    ) -> Result<(Vec<String>, Option<String>), Error> {
         let Some(mnt_ns) = self.mnt_namespaces.get(&ns) else {
             return Err(Error::UnknownMntNs(ns));
         };
@@ -443,9 +442,10 @@ impl Cache {
             // we create key to check if we already have cached
             // signatures for that file
             let key = Key::from_path_in_ns(ns, path).map_err(namespace::Error::other)?;
+            let mut msg = None;
 
             if key.size > FILE_SIZE_SCAN_LIMIT {
-                return Err(namespace::Error::other(Error::FileSizeScanLimit));
+                msg = Some(String::from("partial scan, file size exceeds scan limit"))
             }
 
             let sigs = match self.signatures.get(&key) {
@@ -465,7 +465,7 @@ impl Cache {
                 }
             };
 
-            Ok(sigs)
+            Ok((sigs, msg))
         });
 
         // we must be sure that we restore our namespace
