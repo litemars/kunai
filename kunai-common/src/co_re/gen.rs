@@ -32,6 +32,11 @@ pub struct kuid_t {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct kernel_cap_struct_v2 {
+    pub val: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct cred {
     pub uid: kuid_t,
     pub gid: kgid_t,
@@ -41,6 +46,9 @@ pub struct cred {
     pub egid: kgid_t,
     pub fsuid: kuid_t,
     pub fsgid: kgid_t,
+    pub cap_inheritable: kernel_cap_struct_v2,
+    pub cap_permitted: kernel_cap_struct_v2,
+    pub cap_effective: kernel_cap_struct_v2,
 }
 unsafe extern "C" {
     pub fn shim_cred_uid(pcred: *mut cred) -> uid_t;
@@ -65,6 +73,15 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn shim_cred_fsgid(pcred: *mut cred) -> gid_t;
+}
+unsafe extern "C" {
+    pub fn shim_cred_cap_effective(pcred: *mut cred) -> __u64;
+}
+unsafe extern "C" {
+    pub fn shim_cred_cap_permitted(pcred: *mut cred) -> __u64;
+}
+unsafe extern "C" {
+    pub fn shim_cred_cap_inheritable(pcred: *mut cred) -> __u64;
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
