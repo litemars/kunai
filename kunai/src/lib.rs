@@ -59,10 +59,10 @@ fn configure_probes(conf: &Config, programs: &mut Programs, target: KernelVersio
         .expect_mut("creds_security_task_fix_setuid")
         .min_kernel(kernel!(5, 4))
         .prio(0);
-
+        
     programs
         .expect_mut("creds_security_task_fix_setgid")
-        .min_kernel(kernel!(5, 4))
+        .min_kernel(kernel!(5, 8))
         .prio(0);
 
     programs
